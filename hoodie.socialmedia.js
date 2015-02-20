@@ -504,6 +504,15 @@ Hoodie.extend(function (hoodie) {
       return defer.promise();
     },
 
+    dualUnfollow: function (userId) {
+      var defer = window.jQuery.Deferred();
+      defer.notify('dualUnfollow', arguments, false);
+      hoodie.pubsub.unbidirectional(userId, hoodie.socialmedia.pubsubtypes)
+        .then(defer.resolve)
+        .fail(defer.reject);
+      return defer.promise();
+    },
+
     pendentFriends: function () {
       var defer = window.jQuery.Deferred();
       hoodie.store.findAll('notification')
@@ -552,6 +561,38 @@ Hoodie.extend(function (hoodie) {
         .then(defer.resolve)
         .fail(defer.reject);
 
+      return defer.promise();
+    },
+    getRelationStatus: function (userId) {
+      var defer = window.jQuery.Deferred();
+      defer.notify('getRelationStatus', arguments, false);
+      if (userId == hoodie.id()) {
+        defer.reject('You cannot check yourself.');
+        return defer.promise();
+      }
+      hoodie.socialmedia.friends().then(function (task) {
+        var ids = jQuery.map(task.socialmedia.friends, function (user) {
+          return user._id.split('/').pop();
+        });
+        if (jQuery.inArray(userId, ids) !== -1) {
+          return defer.resolve('friend');
+        }
+
+        var task = {
+          socialmedia: {
+            userId: userId
+          }
+        };
+
+        hoodie.task('socialmediagetrelation').start(task).then(function (task) {
+          if (task.socialmedia.relation.length > 0) {
+            return defer.resolve('pending');
+          }
+          return defer.resolve('none');
+        })
+        .fail(defer.reject);
+        hoodie.remote.push();
+      }).fail(defer.reject);
       return defer.promise();
     },
 
